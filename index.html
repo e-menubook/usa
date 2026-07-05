@@ -11,32 +11,36 @@
             height: 100vh; display: flex; flex-direction: column; box-sizing: border-box;
         }
         
-        /* 左右2カラムの固定レイアウト */
-        .page-wrapper { 
-            display: flex; gap: 20px; flex: 1; overflow: hidden; max-width: 1000px; margin: 0 auto; width: 100%;
-        }
+        .page-wrapper { display: flex; gap: 20px; flex: 1; overflow: hidden; max-width: 1000px; margin: 0 auto; width: 100%; }
         
-        /* 左側のコントロールパネル：個別にスクロール */
         .control-panel { 
             flex: 0 0 280px; background-color: #fff; padding: 15px; border-radius: 8px; 
             border: 1px solid #ccc; overflow-y: auto; box-shadow: 2px 2px 5px rgba(0,0,0,0.05);
         }
         
-        /* 右側のメインエリア：個別にスクロール */
         .container { 
             flex: 1; background: #fff; padding: 15px; border: 1px solid #bbb; 
             border-radius: 8px; overflow-y: auto; box-shadow: 2px 2px 5px rgba(0,0,0,0.05);
         }
         
-        /* 以下ヘッダー・UI装飾 */
+        /* ヘッダー・タイトル装飾 */
         .header-image-container { position: relative; width: 100%; margin-bottom: 15px; }
         .header-image { width: 100%; height: auto; display: block; border-radius: 4px; }
-        .header-title-overlay { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; width: 90%; color: #000; pointer-events: none; text-shadow: 1px 1px 2px rgba(255,255,255,0.8), 0 0 5px rgba(255,255,255,0.5); }
-        .header-title-line1 { font-size: 20px; font-weight: bold; }
-        .header-title-line2 { font-size: 16px; }
+        
+        .header-title-overlay { 
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
+            text-align: center; width: 90%; color: #000; pointer-events: none; 
+            text-shadow: 1px 1px 2px rgba(255,255,255,0.8), 0 0 5px rgba(255,255,255,0.5); 
+        }
+        /* 画面幅に合わせてタイトルを大きく変動 */
+        .header-title-line1 { font-size: clamp(18px, 3.5vw, 32px); font-weight: bold; }
+        .header-title-line2 { font-size: clamp(14px, 2.5vw, 20px); }
+        
         .icon-wrapper { position: absolute; top: 5%; left: 1%; width: 18%; aspect-ratio: 1 / 0.8; z-index: 10; display: flex; align-items: center; justify-content: center; }
         .left-icon { width: 100%; height: 100%; object-fit: contain; }
-        .month-text-overlay { position: absolute; font-size: 18px; font-weight: bold; color: red; text-shadow: 1px 1px 0px #fff; pointer-events: none; }
+        /* アイコン内文字も画面幅に合わせて拡大 */
+        .month-text-overlay { position: absolute; font-size: clamp(10px, 2.5vw, 22px); font-weight: bold; color: red; text-shadow: 1px 1px 0px #fff; pointer-events: none; }
+        
         .month-image { position: absolute; top: 5%; right: 1%; width: 22%; aspect-ratio: 1 / 1; object-fit: contain; z-index: 10; }
         
         .panel-label { font-size: 12px; color: #666; margin: 15px 0 5px 0; font-weight: bold; }
@@ -121,7 +125,7 @@
 
     async function checkDataExistence(m, btn) {
         try {
-            const res = await fetch(`https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(m)}`);
+            const res = await fetch(`https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(m)}&_=${new Date().getTime()}`);
             const text = await res.text();
             const json = JSON.parse(text.substring(text.indexOf('{'), text.lastIndexOf('}') + 1));
             if (!json.table.rows || json.table.rows.length === 0) {
@@ -138,7 +142,7 @@
         loadingDiv.style.display = 'block'; tableEl.style.display = 'none';
         
         try {
-            const res = await fetch(`https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(sheetName)}`);
+            const res = await fetch(`https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(sheetName)}&_=${new Date().getTime()}`);
             const text = await res.text();
             const json = JSON.parse(text.substring(text.indexOf('{'), text.lastIndexOf('}') + 1));
             currentSheetData = json.table.rows.filter(r => r.c && r.c[6] && r.c[6].v).map(r => ({
