@@ -14,16 +14,20 @@
         .page-wrapper { display: flex; gap: 20px; flex: 1; overflow: hidden; max-width: 1000px; margin: 0 auto; width: 100%; }
         
         .control-panel { 
-            flex: 0 0 280px; background-color: #fff; padding: 15px; border-radius: 8px; 
+            flex: 0 0 320px; background-color: #fff; padding: 15px; border-radius: 8px; 
             border: 1px solid #ccc; overflow-y: auto; box-shadow: 2px 2px 5px rgba(0,0,0,0.05);
         }
+        
+        /* 選択エリアの横並び設定：月列を狭く、店舗列を広く設定 */
+        .selector-row { display: flex; gap: 10px; margin-bottom: 10px; }
+        .selector-column:nth-child(1) { flex: 0 0 75px; } 
+        .selector-column:nth-child(2) { flex: 1; }
         
         .container { 
             flex: 1; background: #fff; padding: 15px; border: 1px solid #bbb; 
             border-radius: 8px; overflow-y: auto; box-shadow: 2px 2px 5px rgba(0,0,0,0.05);
         }
         
-        /* ヘッダー・タイトル装飾 */
         .header-image-container { position: relative; width: 100%; margin-bottom: 15px; }
         .header-image { width: 100%; height: auto; display: block; border-radius: 4px; }
         
@@ -41,22 +45,20 @@
         
         .month-image { position: absolute; top: 5%; right: 1%; width: 22%; aspect-ratio: 1 / 1; object-fit: contain; z-index: 10; }
         
-        /* 追加：上部ツールボタン */
         .top-tools { display: flex; gap: 5px; margin-bottom: 10px; }
         .tool-btn { flex: 1; padding: 5px; font-size: 12px; cursor: pointer; border: 1px solid #999; border-radius: 4px; background: #eee; }
 
-        .panel-label { font-size: 12px; color: #666; margin: 15px 0 5px 0; font-weight: bold; }
-        .btn { display: block; width: 100%; margin-bottom: 5px; padding: 8px; border: 1px solid #ccc; background-color: #e6e6e6; cursor: pointer; font-size: 13px; border-radius: 4px; text-align: left; }
+        .panel-label { font-size: 11px; color: #666; margin: 0 0 5px 0; font-weight: bold; white-space: nowrap; }
+        .btn { display: block; width: 100%; margin-bottom: 4px; padding: 6px 2px; border: 1px solid #ccc; background-color: #e6e6e6; cursor: pointer; font-size: 11px; border-radius: 4px; text-align: center; }
         .btn.active { background-color: #107c41; color: #fff; font-weight: bold; }
         .btn.disabled { background-color: #ccc; color: #888; cursor: not-allowed; opacity: 0.6; }
-        .view-selector { display: flex; gap: 5px; margin-bottom: 10px; }
-        .view-btn { width: 50%; text-align: center; }
+        .view-selector { display: flex; gap: 5px; margin-bottom: 15px; }
+        .view-btn { width: 50%; padding: 8px; font-size: 13px; text-align: center; }
         
         table { width: 100%; border-collapse: collapse; border: 1px solid #bbb; font-size: 14px; table-layout: fixed; }
         th, td { padding: 12px 8px; border: 1px solid #ccc; word-wrap: break-word; }
         th { background-color: #107c41; color: #fff; }
         
-        /* 列幅の設定 */
         .col-rank { text-align: center; width: 10%; background-color: #f9f9f9; }
         .col-name { width: 30%; }
         .col-count { text-align: right; width: 15%; font-weight: bold; white-space: nowrap; }
@@ -72,20 +74,16 @@
             .control-panel, .container { overflow-y: visible; }
         }
 
-        /* 印刷用スタイル */
         @media print {
-            /* 背景色を印刷に含める設定 */
-            * {
-                -webkit-print-color-adjust: exact !important;
-                print-color-adjust: exact !important;
-            }
+            * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
             .control-panel, .top-tools, .view-selector, .panel-label, .month-btn, .team-filter-btn { display: none !important; }
             .page-wrapper { display: block !important; width: 100% !important; }
             .container { border: none !important; box-shadow: none !important; padding: 0 !important; overflow: visible !important; }
             @page { size: A4; margin: 15mm; }
-            table { page-break-inside: auto; }
+            table { page-break-inside: auto; border-top: 1px solid #bbb; }
             tr { page-break-inside: avoid; page-break-after: auto; }
-            thead { display: table-header-group; }
+            thead { display: none !important; }
+            tbody tr:first-child td { border-top: 1px solid #bbb; }
         }
     </style>
 </head>
@@ -102,11 +100,16 @@
             <button class="btn view-btn active" onclick="changeViewMode('personal', this)">👤 個人</button>
             <button class="btn view-btn" onclick="changeViewMode('teamTotal', this)">🏢 店舗</button>
         </div>
-        <div class="panel-label">月を選択</div>
-        <div id="monthContainer"></div>
-        <div id="teamSelectorSection">
-            <div class="panel-label">店舗絞り込み</div>
-            <div id="teamButtonContainer"></div>
+
+        <div class="selector-row">
+            <div class="selector-column">
+                <div class="panel-label">月</div>
+                <div id="monthContainer"></div>
+            </div>
+            <div id="teamSelectorSection" class="selector-column">
+                <div class="panel-label">店舗</div>
+                <div id="teamButtonContainer"></div>
+            </div>
         </div>
     </div>
 
@@ -137,9 +140,7 @@
     const months = ['10', '11', '12', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
     let currentSheetData = [], currentViewMode = 'personal', currentSelectedTeam = '全員';
 
-    function openSettings() {
-        alert("設定メニューは現在準備中です。");
-    }
+    function openSettings() { alert("設定メニューは現在準備中です。"); }
 
     async function init() {
         const container = document.getElementById('monthContainer');
@@ -160,10 +161,7 @@
             const res = await fetch(`https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(m)}&_=${new Date().getTime()}`);
             const text = await res.text();
             const json = JSON.parse(text.substring(text.indexOf('{'), text.lastIndexOf('}') + 1));
-            if (!json.table.rows || json.table.rows.length === 0) {
-                btn.classList.add('disabled');
-                btn.onclick = null; 
-            }
+            if (!json.table.rows || json.table.rows.length === 0) { btn.classList.add('disabled'); btn.onclick = null; }
         } catch (e) { btn.classList.add('disabled'); }
     }
 
