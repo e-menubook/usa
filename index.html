@@ -32,17 +32,19 @@
             text-align: center; width: 90%; color: #000; pointer-events: none; 
             text-shadow: 1px 1px 2px rgba(255,255,255,0.8), 0 0 5px rgba(255,255,255,0.5); 
         }
-        /* 画面幅に合わせてタイトルを大きく変動 */
         .header-title-line1 { font-size: clamp(18px, 3.5vw, 32px); font-weight: bold; }
         .header-title-line2 { font-size: clamp(14px, 2.5vw, 20px); }
         
         .icon-wrapper { position: absolute; top: 5%; left: 1%; width: 18%; aspect-ratio: 1 / 0.8; z-index: 10; display: flex; align-items: center; justify-content: center; }
         .left-icon { width: 100%; height: 100%; object-fit: contain; }
-        /* アイコン内文字も画面幅に合わせて拡大 */
         .month-text-overlay { position: absolute; font-size: clamp(10px, 2.5vw, 22px); font-weight: bold; color: red; text-shadow: 1px 1px 0px #fff; pointer-events: none; }
         
         .month-image { position: absolute; top: 5%; right: 1%; width: 22%; aspect-ratio: 1 / 1; object-fit: contain; z-index: 10; }
         
+        /* 追加：上部ツールボタン */
+        .top-tools { display: flex; gap: 5px; margin-bottom: 10px; }
+        .tool-btn { flex: 1; padding: 5px; font-size: 12px; cursor: pointer; border: 1px solid #999; border-radius: 4px; background: #eee; }
+
         .panel-label { font-size: 12px; color: #666; margin: 15px 0 5px 0; font-weight: bold; }
         .btn { display: block; width: 100%; margin-bottom: 5px; padding: 8px; border: 1px solid #ccc; background-color: #e6e6e6; cursor: pointer; font-size: 13px; border-radius: 4px; text-align: left; }
         .btn.active { background-color: #107c41; color: #fff; font-weight: bold; }
@@ -50,19 +52,40 @@
         .view-selector { display: flex; gap: 5px; margin-bottom: 10px; }
         .view-btn { width: 50%; text-align: center; }
         
-        table { width: 100%; border-collapse: collapse; border: 1px solid #bbb; font-size: 14px; }
-        th, td { padding: 12px 8px; border: 1px solid #ccc; }
+        table { width: 100%; border-collapse: collapse; border: 1px solid #bbb; font-size: 14px; table-layout: fixed; }
+        th, td { padding: 12px 8px; border: 1px solid #ccc; word-wrap: break-word; }
         th { background-color: #107c41; color: #fff; }
-        .col-rank { text-align: center; width: 15%; background-color: #f9f9f9; }
-        .col-count { text-align: right; width: 20%; font-weight: bold; }
-        .rank-1 td { background-color: #fffde7; }
-        .rank-2 td { background-color: #e3f2fd; }
-        .rank-3 td { background-color: #fce4ec; }
+        
+        /* 列幅の設定 */
+        .col-rank { text-align: center; width: 10%; background-color: #f9f9f9; }
+        .col-name { width: 30%; }
+        .col-count { text-align: right; width: 15%; font-weight: bold; white-space: nowrap; }
+        .col-team { width: 45%; }
+        
+        .rank-1 td { background-color: #fffde7 !important; }
+        .rank-2 td { background-color: #e3f2fd !important; }
+        .rank-3 td { background-color: #fce4ec !important; }
 
         @media (max-width: 768px) {
             body { height: auto; }
             .page-wrapper { flex-direction: column; overflow: visible; }
             .control-panel, .container { overflow-y: visible; }
+        }
+
+        /* 印刷用スタイル */
+        @media print {
+            /* 背景色を印刷に含める設定 */
+            * {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+            .control-panel, .top-tools, .view-selector, .panel-label, .month-btn, .team-filter-btn { display: none !important; }
+            .page-wrapper { display: block !important; width: 100% !important; }
+            .container { border: none !important; box-shadow: none !important; padding: 0 !important; overflow: visible !important; }
+            @page { size: A4; margin: 15mm; }
+            table { page-break-inside: auto; }
+            tr { page-break-inside: avoid; page-break-after: auto; }
+            thead { display: table-header-group; }
         }
     </style>
 </head>
@@ -70,6 +93,11 @@
 
 <div class="page-wrapper">
     <div class="control-panel">
+        <div class="top-tools">
+            <button class="tool-btn" onclick="window.print()">🖨️ 印刷</button>
+            <button class="tool-btn" onclick="openSettings()">⚙️ 設定</button>
+        </div>
+
         <div class="view-selector">
             <button class="btn view-btn active" onclick="changeViewMode('personal', this)">👤 個人</button>
             <button class="btn view-btn" onclick="changeViewMode('teamTotal', this)">🏢 店舗</button>
@@ -108,6 +136,10 @@
     const spreadsheetId = '14gjs9UR7LUtsuR9sau24INTmC7r5cb_p5Np0hA_jOa8';
     const months = ['10', '11', '12', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
     let currentSheetData = [], currentViewMode = 'personal', currentSelectedTeam = '全員';
+
+    function openSettings() {
+        alert("設定メニューは現在準備中です。");
+    }
 
     async function init() {
         const container = document.getElementById('monthContainer');
@@ -171,22 +203,22 @@
         tbody.innerHTML = '';
         if (currentViewMode === 'personal') {
             h2.innerText = '（個人別）';
-            document.getElementById('tableHeader').innerHTML = `<tr><th>順位</th><th>名前</th><th>件数</th><th>所属</th></tr>`;
+            document.getElementById('tableHeader').innerHTML = `<tr><th class="col-rank">順位</th><th class="col-name">名前</th><th class="col-count">件数</th><th class="col-team">所属</th></tr>`;
             (currentSelectedTeam === '全員' ? currentSheetData : currentSheetData.filter(i => i.team === currentSelectedTeam))
                 .sort((a, b) => b.count - a.count).forEach((item, i) => {
                     const tr = document.createElement('tr');
                     if (i < 3) tr.className = `rank-${i+1}`;
-                    tr.innerHTML = `<td class="col-rank">${i+1}位</td><td>${item.name}</td><td class="col-count">${item.count.toLocaleString()}</td><td>${item.team}</td>`;
+                    tr.innerHTML = `<td class="col-rank">${i+1}位</td><td class="col-name"><strong>${item.name}</strong></td><td class="col-count">${item.count.toLocaleString()} 件</td><td class="col-team">${item.team}</td>`;
                     tbody.appendChild(tr);
                 });
         } else {
             h2.innerText = '（店舗別）';
-            document.getElementById('tableHeader').innerHTML = `<tr><th>順位</th><th>店舗名</th><th>合計件数</th></tr>`;
+            document.getElementById('tableHeader').innerHTML = `<tr><th class="col-rank">順位</th><th class="col-name">店舗名</th><th class="col-count">合計件数</th></tr>`;
             const map = {}; currentSheetData.forEach(i => map[i.team] = (map[i.team] || 0) + i.count);
             Object.keys(map).map(t => ({t, c: map[t]})).sort((a, b) => b.c - a.c).forEach((item, i) => {
                 const tr = document.createElement('tr');
                 if (i < 3) tr.className = `rank-${i+1}`;
-                tr.innerHTML = `<td class="col-rank">${i+1}位</td><td>${item.t}</td><td class="col-count">${item.c.toLocaleString()}</td>`;
+                tr.innerHTML = `<td class="col-rank">${i+1}位</td><td class="col-name"><strong>${item.t}</strong></td><td class="col-count">${item.c.toLocaleString()} 件</td>`;
                 tbody.appendChild(tr);
             });
         }
