@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>月別数量ランキング</title>
+    <style>
+        body { 
+            font-family: "Rounded M+ 1c", "Hiragino Maru Gothic ProN", "ヒラギノ丸ゴ ProN", "HG丸ｺﾞｼｯｸM-PRO", "MotoyaLMaru", sans-serif; 
+            background-color: #f3f3f3; color: #333; margin: 0; padding: 10px;
+            height: 100vh; display: flex; flex-direction: column; box-sizing: border-box;
+        }
+        
+        /* 左右2カラムの固定レイアウト */
+        .page-wrapper { 
+            display: flex; gap: 20px; flex: 1; overflow: hidden; max-width: 1000px; margin: 0 auto; width: 100%;
+        }
+        
+        /* 左側のコントロールパネル：個別にスクロール */
+        .control-panel { 
+            flex: 0 0 280px; background-color: #fff; padding: 15px; border-radius: 8px; 
+            border: 1px solid #ccc; overflow-y: auto; box-shadow: 2px 2px 5px rgba(0,0,0,0.05);
+        }
+        
+        /* 右側のメインエリア：個別にスクロール */
+        .container { 
+            flex: 1; background: #fff; padding: 15px; border: 1px solid #bbb; 
+            border-radius: 8px; overflow-y: auto; box-shadow: 2px 2px 5px rgba(0,0,0,0.05);
+        }
+        
+        /* 以下ヘッダー・UI装飾 */
+        .header-image-container { position: relative; width: 100%; margin-bottom: 15px; }
+        .header-image { width: 100%; height: auto; display: block; border-radius: 4px; }
+        .header-title-overlay { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; width: 90%; color: #000; pointer-events: none; text-shadow: 1px 1px 2px rgba(255,255,255,0.8), 0 0 5px rgba(255,255,255,0.5); }
+        .header-title-line1 { font-size: 20px; font-weight: bold; }
+        .header-title-line2 { font-size: 16px; }
+        .icon-wrapper { position: absolute; top: 5%; left: 1%; width: 18%; aspect-ratio: 1 / 0.8; z-index: 10; display: flex; align-items: center; justify-content: center; }
+        .left-icon { width: 100%; height: 100%; object-fit: contain; }
+        .month-text-overlay { position: absolute; font-size: 18px; font-weight: bold; color: red; text-shadow: 1px 1px 0px #fff; pointer-events: none; }
+        .month-image { position: absolute; top: 5%; right: 1%; width: 22%; aspect-ratio: 1 / 1; object-fit: contain; z-index: 10; }
+        
+        .panel-label { font-size: 12px; color: #666; margin: 15px 0 5px 0; font-weight: bold; }
+        .btn { display: block; width: 100%; margin-bottom: 5px; padding: 8px; border: 1px solid #ccc; background-color: #e6e6e6; cursor: pointer; font-size: 13px; border-radius: 4px; text-align: left; }
+        .btn.active { background-color: #107c41; color: #fff; font-weight: bold; }
+        .btn.disabled { background-color: #ccc; color: #888; cursor: not-allowed; opacity: 0.6; }
+        .view-selector { display: flex; gap: 5px; margin-bottom: 10px; }
+        .view-btn { width: 50%; text-align: center; }
+        
+        table { width: 100%; border-collapse: collapse; border: 1px solid #bbb; font-size: 14px; }
+        th, td { padding: 12px 8px; border: 1px solid #ccc; }
+        th { background-color: #107c41; color: #fff; }
+        .col-rank { text-align: center; width: 15%; background-color: #f9f9f9; }
+        .col-count { text-align: right; width: 20%; font-weight: bold; }
+        .rank-1 td { background-color: #fffde7; }
+        .rank-2 td { background-color: #e3f2fd; }
+        .rank-3 td { background-color: #fce4ec; }
+
+        @media (max-width: 768px) {
+            body { height: auto; }
+            .page-wrapper { flex-direction: column; overflow: visible; }
+            .control-panel, .container { overflow-y: visible; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="page-wrapper">
+    <div class="control-panel">
+        <div class="view-selector">
+            <button class="btn view-btn active" onclick="changeViewMode('personal', this)">👤 個人</button>
+            <button class="btn view-btn" onclick="changeViewMode('teamTotal', this)">🏢 店舗</button>
+        </div>
+        <div class="panel-label">月を選択</div>
+        <div id="monthContainer"></div>
+        <div id="teamSelectorSection">
+            <div class="panel-label">店舗絞り込み</div>
+            <div id="teamButtonContainer"></div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="header-image-container">
+            <div class="icon-wrapper">
+                <img src="title_f.png" alt="アイコン" class="left-icon">
+                <div id="monthTextOverlay" class="month-text-overlay">10月</div>
+            </div>
+            <img id="headerImg" src="title.png" alt="ヘッダー画像" class="header-image">
+            <div class="header-title-overlay">
+                <div class="header-title-line1">Usappy新規発券ランキング</div>
+                <div id="headerTitleLine2" class="header-title-line2">（個人別）</div>
+            </div>
+            <img id="monthImg" src="10.png" alt="月" class="month-image">
+        </div>
+
+        <div id="loading">データを読み込み中...</div>
+        <table id="rankingTable" style="display: none;">
+            <thead id="tableHeader"></thead>
+            <tbody id="rankingBody"></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    const spreadsheetId = '14gjs9UR7LUtsuR9sau24INTmC7r5cb_p5Np0hA_jOa8';
+    const months = ['10', '11', '12', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
+    let currentSheetData = [], currentViewMode = 'personal', currentSelectedTeam = '全員';
+
+    async function init() {
+        const container = document.getElementById('monthContainer');
+        for (let m of months) {
+            const btn = document.createElement('button');
+            btn.className = 'btn month-btn';
+            if (m === '10') btn.classList.add('active');
+            btn.innerText = m + '月';
+            btn.onclick = () => changeMonth(m, btn);
+            container.appendChild(btn);
+            checkDataExistence(m, btn);
+        }
+        loadRanking('10');
+    }
+
+    async function checkDataExistence(m, btn) {
+        try {
+            const res = await fetch(`https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(m)}`);
+            const text = await res.text();
+            const json = JSON.parse(text.substring(text.indexOf('{'), text.lastIndexOf('}') + 1));
+            if (!json.table.rows || json.table.rows.length === 0) {
+                btn.classList.add('disabled');
+                btn.onclick = null; 
+            }
+        } catch (e) { btn.classList.add('disabled'); }
+    }
+
+    async function loadRanking(sheetName) {
+        const loadingDiv = document.getElementById('loading'), tableEl = document.getElementById('rankingTable');
+        document.getElementById('monthImg').src = `${sheetName}.png`;
+        document.getElementById('monthTextOverlay').innerText = `${sheetName}月`;
+        loadingDiv.style.display = 'block'; tableEl.style.display = 'none';
+        
+        try {
+            const res = await fetch(`https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(sheetName)}`);
+            const text = await res.text();
+            const json = JSON.parse(text.substring(text.indexOf('{'), text.lastIndexOf('}') + 1));
+            currentSheetData = json.table.rows.filter(r => r.c && r.c[6] && r.c[6].v).map(r => ({
+                name: String(r.c[6].v).trim(), team: r.c[3] ? String(r.c[3].v).trim() : '未所属',
+                count: r.c[7] ? Number(String(r.c[7].v).replace(/[^0-9.]/g, '')) || 0 : 0
+            })).filter(i => !['名前', 'スタッフ名', '合計', '計'].includes(i.name));
+            generateTeamButtons(); updateDisplay();
+        } catch (e) { loadingDiv.innerText = '読み込み失敗'; }
+    }
+
+    function generateTeamButtons() {
+        const container = document.getElementById('teamButtonContainer');
+        container.innerHTML = `<button class="btn team-filter-btn active" onclick="filterByTeam('全員', this)">全員</button>`;
+        if (currentViewMode === 'teamTotal') return;
+        const uniqueTeams = [...new Set(currentSheetData.map(i => i.team).filter(t => t !== '未所属'))];
+        uniqueTeams.forEach(t => {
+            const btn = document.createElement('button');
+            btn.className = 'btn team-filter-btn';
+            btn.innerText = t; btn.onclick = () => filterByTeam(t, btn);
+            container.appendChild(btn);
+        });
+    }
+
+    function updateDisplay() {
+        const tbody = document.getElementById('rankingBody'), h2 = document.getElementById('headerTitleLine2');
+        tbody.innerHTML = '';
+        if (currentViewMode === 'personal') {
+            h2.innerText = '（個人別）';
+            document.getElementById('tableHeader').innerHTML = `<tr><th>順位</th><th>名前</th><th>件数</th><th>所属</th></tr>`;
+            (currentSelectedTeam === '全員' ? currentSheetData : currentSheetData.filter(i => i.team === currentSelectedTeam))
+                .sort((a, b) => b.count - a.count).forEach((item, i) => {
+                    const tr = document.createElement('tr');
+                    if (i < 3) tr.className = `rank-${i+1}`;
+                    tr.innerHTML = `<td class="col-rank">${i+1}位</td><td>${item.name}</td><td class="col-count">${item.count.toLocaleString()}</td><td>${item.team}</td>`;
+                    tbody.appendChild(tr);
+                });
+        } else {
+            h2.innerText = '（店舗別）';
+            document.getElementById('tableHeader').innerHTML = `<tr><th>順位</th><th>店舗名</th><th>合計件数</th></tr>`;
+            const map = {}; currentSheetData.forEach(i => map[i.team] = (map[i.team] || 0) + i.count);
+            Object.keys(map).map(t => ({t, c: map[t]})).sort((a, b) => b.c - a.c).forEach((item, i) => {
+                const tr = document.createElement('tr');
+                if (i < 3) tr.className = `rank-${i+1}`;
+                tr.innerHTML = `<td class="col-rank">${i+1}位</td><td>${item.t}</td><td class="col-count">${item.c.toLocaleString()}</td>`;
+                tbody.appendChild(tr);
+            });
+        }
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('rankingTable').style.display = 'table';
+    }
+
+    function changeMonth(m, btn) { document.querySelectorAll('.month-btn').forEach(b => b.classList.remove('active')); btn.classList.add('active'); loadRanking(m); }
+    function changeViewMode(m, btn) { currentViewMode = m; document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active')); btn.classList.add('active'); document.getElementById('teamSelectorSection').style.display = (m === 'personal') ? 'block' : 'none'; updateDisplay(); }
+    function filterByTeam(t, btn) { currentSelectedTeam = t; document.querySelectorAll('.team-filter-btn').forEach(b => b.classList.remove('active')); btn.classList.add('active'); updateDisplay(); }
+
+    init();
+</script>
+</body>
+</html>
+
