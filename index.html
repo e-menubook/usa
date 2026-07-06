@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>月別数量ランキング</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         body { 
             font-family: "Rounded M+ 1c", "Hiragino Maru Gothic ProN", "ヒラギノ丸ゴ ProN", "HG丸ｺﾞｼｯｸM-PRO", "MotoyaLMaru", sans-serif; 
@@ -11,7 +12,6 @@
             height: 100vh; display: flex; flex-direction: column; box-sizing: border-box;
         }
         
-        /* 画面幅いっぱいに広がるように変更 */
         .page-wrapper { 
             display: flex; 
             gap: 20px; 
@@ -83,6 +83,31 @@
             .page-wrapper { flex-direction: column; overflow: visible; width: 100%; }
             .control-panel, .container { overflow-y: visible; }
         }
+
+        /* 設定モーダル用のスタイル */
+        #settingsModal {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+            background: rgba(0,0,0,0.6); z-index: 9999; 
+            justify-content: center; align-items: center;
+        }
+        .modal-content {
+            background: #fff; padding: 25px; border-radius: 8px; width: 320px; 
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2); text-align: center;
+        }
+        .modal-content h3 { margin-top: 0; color: #107c41; }
+        .modal-content p { font-size: 13px; color: #555; text-align: left; }
+        .modal-btn {
+            padding: 8px 12px; margin: 5px; cursor: pointer; border: none; 
+            border-radius: 4px; color: #fff; font-weight: bold; font-size: 13px;
+        }
+        .btn-save { background-color: #107c41; }
+        .btn-close { background-color: #666; }
+        .btn-clear { background-color: #d32f2f; }
+        .btn-save:disabled { background-color: #ccc; cursor: not-allowed; }
+        .data-source-badge {
+            display: inline-block; padding: 3px 6px; font-size: 10px; border-radius: 3px; 
+            margin-left: 5px; background-color: #fff3cd; color: #856404; border: 1px solid #ffeeba;
+        }
     </style>
 </head>
 <body>
@@ -91,7 +116,7 @@
     <div class="control-panel">
         <div class="top-tools">
             <button class="tool-btn" onclick="window.print()">🖨️ 印刷</button>
-            <button class="tool-btn" onclick="alert('設定は準備中です')">⚙️ 設定</button>
+            <button class="tool-btn" onclick="openSettings()">⚙️ 設定</button>
         </div>
         <div class="view-selector">
             <button class="btn view-btn active" onclick="changeViewMode('personal', this)">👤 個人</button>
@@ -107,6 +132,7 @@
                 <div id="teamButtonContainer"></div>
             </div>
         </div>
+        <div id="dataSourceInfo" style="margin-top: 10px; text-align: center;"></div>
     </div>
 
     <div class="container">
@@ -133,12 +159,36 @@
     </div>
 </div>
 
+<div id="settingsModal">
+    <div class="modal-content">
+        <h3>データ設定</h3>
+        <p>EXCELファイルを読み込んでデータをGASへ送信し、同時にブラウザにも記憶させます。（次回起動時は記憶したデータから素早く集計します）</p>
+        <p style="font-size: 11px; color: #999;">※シート名（10, 11...）と列構成（D列:店舗, G列:名前, H列:件数）が合致している必要があります。</p>
+        <input type="file" id="excelFileInput" accept=".xlsx, .xls" style="margin: 15px 0; width: 100%;">
+        <div>
+            <button id="saveBtn" class="modal-btn btn-save" onclick="saveExcelData()">💾 保存</button>
+            <button class="modal-btn btn-clear" onclick="clearExcelData()">🗑️ リセット</button>
+            <button class="modal-btn btn-close" onclick="closeSettings()">✖ 閉じる</button>
+        </div>
+    </div>
+</div>
+
 <script>
     const spreadsheetId = '14gjs9UR7LUtsuR9sau24INTmC7r5cb_p5Np0hA_jOa8';
+    const gasUrl = 'https://script.google.com/macros/s/AKfycbyBYgnlXWvSKE_FDgccB69J16REWks579pvtNUoj5QsrWQD6u-8DjzxWIb8YODYxIK2bg/exec';
     const months = ['年間', '10', '11', '12', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
     let currentSheetData = [], currentViewMode = 'personal', currentSelectedTeam = '全員';
+    let isUsingLocalData = false;
 
     async function init() {
+        // ローカルストレージにEXCELデータが記憶されているか確認
+        const localData = localStorage.getItem('customExcelData');
+        isUsingLocalData = localData !== null;
+        
+        if (isUsingLocalData) {
+            document.getElementById('dataSourceInfo').innerHTML = '<span class="data-source-badge">Excelデータ適用中</span>';
+        }
+
         const container = document.getElementById('monthContainer');
         for (let m of months) {
             const btn = document.createElement('button');
@@ -153,6 +203,14 @@
     }
 
     async function checkDataExistence(m, btn) {
+        if (isUsingLocalData) {
+            const customData = JSON.parse(localStorage.getItem('customExcelData'));
+            if (!customData[m] || customData[m].length === 0) {
+                btn.classList.add('disabled'); btn.onclick = null;
+            }
+            return;
+        }
+
         try {
             const res = await fetch(`https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(m)}&_=${new Date().getTime()}`);
             const text = await res.text();
@@ -183,25 +241,42 @@
         document.getElementById('monthTextOverlay').innerText = (sheetName === '年間') ? '年間' : `${sheetName}月`;
         
         try {
-            if (sheetName === '年間') {
-                const allData = await Promise.all(months.filter(m => m !== '年間').map(async (m) => {
-                    const res = await fetch(`https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(m)}&_=${new Date().getTime()}`);
+            if (isUsingLocalData) {
+                // ローカルストレージ（ブラウザの記憶）から読み込む
+                const customData = JSON.parse(localStorage.getItem('customExcelData'));
+                if (sheetName === '年間') {
+                    let allData = [];
+                    months.filter(m => m !== '年間').forEach(m => {
+                        if (customData[m]) {
+                            allData = allData.concat(customData[m].filter(i => !['名前', 'スタッフ名', '合計', '計'].includes(i.name)));
+                        }
+                    });
+                    currentSheetData = allData;
+                } else {
+                    currentSheetData = customData[sheetName] ? customData[sheetName].filter(i => !['名前', 'スタッフ名', '合計', '計'].includes(i.name)) : [];
+                }
+            } else {
+                // スプレッドシートから読み込む
+                if (sheetName === '年間') {
+                    const allData = await Promise.all(months.filter(m => m !== '年間').map(async (m) => {
+                        const res = await fetch(`https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(m)}&_=${new Date().getTime()}`);
+                        const text = await res.text();
+                        const json = JSON.parse(text.substring(text.indexOf('{'), text.lastIndexOf('}') + 1));
+                        return json.table.rows.filter(r => r.c && r.c[6] && r.c[6].v).map(r => ({
+                            name: String(r.c[6].v).trim(), team: r.c[3] ? String(r.c[3].v).trim() : '未所属',
+                            count: r.c[7] ? Number(String(r.c[7].v).replace(/[^0-9.]/g, '')) || 0 : 0
+                        })).filter(i => !['名前', 'スタッフ名', '合計', '計'].includes(i.name));
+                    }));
+                    currentSheetData = allData.flat();
+                } else {
+                    const res = await fetch(`https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(sheetName)}&_=${new Date().getTime()}`);
                     const text = await res.text();
                     const json = JSON.parse(text.substring(text.indexOf('{'), text.lastIndexOf('}') + 1));
-                    return json.table.rows.filter(r => r.c && r.c[6] && r.c[6].v).map(r => ({
+                    currentSheetData = json.table.rows.filter(r => r.c && r.c[6] && r.c[6].v).map(r => ({
                         name: String(r.c[6].v).trim(), team: r.c[3] ? String(r.c[3].v).trim() : '未所属',
                         count: r.c[7] ? Number(String(r.c[7].v).replace(/[^0-9.]/g, '')) || 0 : 0
                     })).filter(i => !['名前', 'スタッフ名', '合計', '計'].includes(i.name));
-                }));
-                currentSheetData = allData.flat();
-            } else {
-                const res = await fetch(`https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(sheetName)}&_=${new Date().getTime()}`);
-                const text = await res.text();
-                const json = JSON.parse(text.substring(text.indexOf('{'), text.lastIndexOf('}') + 1));
-                currentSheetData = json.table.rows.filter(r => r.c && r.c[6] && r.c[6].v).map(r => ({
-                    name: String(r.c[6].v).trim(), team: r.c[3] ? String(r.c[3].v).trim() : '未所属',
-                    count: r.c[7] ? Number(String(r.c[7].v).replace(/[^0-9.]/g, '')) || 0 : 0
-                })).filter(i => !['名前', 'スタッフ名', '合計', '計'].includes(i.name));
+                }
             }
             generateTeamButtons(); updateDisplay();
         } catch (e) { loadingDiv.innerText = '読み込み失敗'; }
@@ -259,6 +334,100 @@
     function changeMonth(m, btn) { document.querySelectorAll('.month-btn').forEach(b => b.classList.remove('active')); btn.classList.add('active'); loadRanking(m); }
     function changeViewMode(m, btn) { currentViewMode = m; document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active')); btn.classList.add('active'); document.getElementById('teamSelectorSection').style.display = (m === 'personal') ? 'block' : 'none'; updateDisplay(); }
     function filterByTeam(t, btn) { currentSelectedTeam = t; document.querySelectorAll('.team-filter-btn').forEach(b => b.classList.remove('active')); btn.classList.add('active'); updateDisplay(); }
+
+    /* --- 設定・Excel読み込み・GAS送信関連 --- */
+    function openSettings() {
+        const password = prompt("設定を開くにはパスワードを入力してください。");
+        if (password === "8541") {
+            document.getElementById('settingsModal').style.display = 'flex';
+        } else if (password !== null) {
+            alert("パスワードが間違っています。");
+        }
+    }
+
+    function closeSettings() {
+        document.getElementById('settingsModal').style.display = 'none';
+        document.getElementById('excelFileInput').value = '';
+    }
+
+    function saveExcelData() {
+        const fileInput = document.getElementById('excelFileInput');
+        if (!fileInput.files.length) {
+            alert("ファイルを選択してください。");
+            return;
+        }
+        
+        const file = fileInput.files[0];
+        const reader = new FileReader();
+        const saveBtn = document.getElementById('saveBtn');
+        
+        saveBtn.innerText = "保存中...";
+        saveBtn.disabled = true;
+
+        reader.onload = async function(e) {
+            try {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, {type: 'array'});
+                let newStore = {};
+                
+                workbook.SheetNames.forEach(sheetName => {
+                    const sheet = workbook.Sheets[sheetName];
+                    const json = XLSX.utils.sheet_to_json(sheet, {header: 1}); 
+                    
+                    let parsedRows = [];
+                    // Googleスプレッドシートの構造と合わせる（インデックス 3:店舗, 6:名前, 7:件数）
+                    for (let i = 1; i < json.length; i++) { 
+                        const row = json[i];
+                        if (row && row.length >= 7 && row[6]) { 
+                            parsedRows.push({
+                                name: String(row[6]).trim(),
+                                team: row[3] ? String(row[3]).trim() : '未所属',
+                                count: row[7] ? Number(String(row[7]).replace(/[^0-9.]/g, '')) || 0 : 0
+                            });
+                        }
+                    }
+                    newStore[sheetName] = parsedRows;
+                });
+                
+                // GASへデータをPOST送信
+                await fetch(gasUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'text/plain',
+                    },
+                    body: JSON.stringify(newStore)
+                });
+
+                // ★ローカルストレージ（ブラウザの記憶）にも保存して次回起動時に備える
+                localStorage.setItem('customExcelData', JSON.stringify(newStore));
+
+                alert("データのGASへの送信とブラウザへの保存が完了しました。\n画面を更新して反映します。");
+                location.reload(); 
+            } catch (error) {
+                alert("データの保存に失敗しました。ファイル形式や通信状況を確認してください。");
+                console.error(error);
+                saveBtn.innerText = "💾 保存";
+                saveBtn.disabled = false;
+            }
+        };
+        
+        reader.onerror = function() {
+            alert("ファイルの読み込み中にエラーが発生しました。");
+            saveBtn.innerText = "💾 保存";
+            saveBtn.disabled = false;
+        };
+        
+        reader.readAsArrayBuffer(file);
+    }
+
+    // ★ローカルストレージのデータを削除してスプレッドシート参照に戻す
+    function clearExcelData() {
+        if (confirm("ブラウザに保存されているExcelデータを削除し、Googleスプレッドシートの参照に戻しますか？")) {
+            localStorage.removeItem('customExcelData');
+            alert("データをリセットしました。");
+            location.reload();
+        }
+    }
 
     init();
 </script>
