@@ -11,14 +11,20 @@
             height: 100vh; display: flex; flex-direction: column; box-sizing: border-box;
         }
         
-        .page-wrapper { display: flex; gap: 20px; flex: 1; overflow: hidden; max-width: 1000px; margin: 0 auto; width: 100%; }
-        
-        .control-panel { 
-            flex: 0 0 320px; background-color: #fff; padding: 15px; border-radius: 8px; 
-            border: 1px solid #ccc; overflow-y: auto; box-shadow: 2px 2px 5px rgba(0,0,0,0.05);
+        /* 画面幅いっぱいに広がるように変更 */
+        .page-wrapper { 
+            display: flex; 
+            gap: 20px; 
+            flex: 1; 
+            overflow: hidden; 
+            margin: 0 auto; 
+            width: calc(100% - 20px); 
         }
         
-        /* 選択エリアの横並び設定：月列を狭く、店舗列を広く設定 */
+        .control-panel { 
+            flex: 0 0 260px; background-color: #fff; padding: 15px; border-radius: 8px; 
+            border: 1px solid #ccc; overflow-y: auto; box-shadow: 2px 2px 5px rgba(0,0,0,0.05);
+        }
         .selector-row { display: flex; gap: 10px; margin-bottom: 10px; }
         .selector-column:nth-child(1) { flex: 0 0 75px; } 
         .selector-column:nth-child(2) { flex: 1; }
@@ -30,7 +36,6 @@
         
         .header-image-container { position: relative; width: 100%; margin-bottom: 15px; }
         .header-image { width: 100%; height: auto; display: block; border-radius: 4px; }
-        
         .header-title-overlay { 
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
             text-align: center; width: 90%; color: #000; pointer-events: none; 
@@ -38,52 +43,45 @@
         }
         .header-title-line1 { font-size: clamp(18px, 3.5vw, 32px); font-weight: bold; }
         .header-title-line2 { font-size: clamp(14px, 2.5vw, 20px); }
-        
         .icon-wrapper { position: absolute; top: 5%; left: 1%; width: 18%; aspect-ratio: 1 / 0.8; z-index: 10; display: flex; align-items: center; justify-content: center; }
         .left-icon { width: 100%; height: 100%; object-fit: contain; }
         .month-text-overlay { position: absolute; font-size: clamp(10px, 2.5vw, 22px); font-weight: bold; color: red; text-shadow: 1px 1px 0px #fff; pointer-events: none; }
-        
         .month-image { position: absolute; top: 5%; right: 1%; width: 22%; aspect-ratio: 1 / 1; object-fit: contain; z-index: 10; }
+        .date-range-display { margin-bottom: 15px; font-weight: bold; color: #d32f2f; text-align: center; font-size: 14px; background: #fff0f0; padding: 5px; border-radius: 4px; }
         
         .top-tools { display: flex; gap: 5px; margin-bottom: 10px; }
-        .tool-btn { flex: 1; padding: 5px; font-size: 12px; cursor: pointer; border: 1px solid #999; border-radius: 4px; background: #eee; }
-
+        .tool-btn { flex: 1; padding: 4px; font-size: 11px; cursor: pointer; border: 1px solid #999; border-radius: 4px; background: #eee; }
+        
         .panel-label { font-size: 11px; color: #666; margin: 0 0 5px 0; font-weight: bold; white-space: nowrap; }
-        .btn { display: block; width: 100%; margin-bottom: 4px; padding: 6px 2px; border: 1px solid #ccc; background-color: #e6e6e6; cursor: pointer; font-size: 11px; border-radius: 4px; text-align: center; }
+        
+        .btn { 
+            display: block; margin-bottom: 4px; padding: 6px 8px; border: 1px solid #ccc; 
+            background-color: #e6e6e6; cursor: pointer; font-size: 11px; border-radius: 4px; 
+            text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; 
+            width: 100%; box-sizing: border-box;
+        }
         .btn.active { background-color: #107c41; color: #fff; font-weight: bold; }
         .btn.disabled { background-color: #ccc; color: #888; cursor: not-allowed; opacity: 0.6; }
+        
+        #teamButtonContainer { display: flex; flex-direction: column; align-items: flex-start; }
         .view-selector { display: flex; gap: 5px; margin-bottom: 15px; }
         .view-btn { width: 50%; padding: 8px; font-size: 13px; text-align: center; }
         
         table { width: 100%; border-collapse: collapse; border: 1px solid #bbb; font-size: 14px; table-layout: fixed; }
         th, td { padding: 12px 8px; border: 1px solid #ccc; word-wrap: break-word; }
         th { background-color: #107c41; color: #fff; }
-        
         .col-rank { text-align: center; width: 10%; background-color: #f9f9f9; }
         .col-name { width: 30%; }
         .col-count { text-align: right; width: 15%; font-weight: bold; white-space: nowrap; }
         .col-team { width: 45%; }
-        
         .rank-1 td { background-color: #fffde7 !important; }
         .rank-2 td { background-color: #e3f2fd !important; }
         .rank-3 td { background-color: #fce4ec !important; }
-
+        
         @media (max-width: 768px) {
             body { height: auto; }
-            .page-wrapper { flex-direction: column; overflow: visible; }
+            .page-wrapper { flex-direction: column; overflow: visible; width: 100%; }
             .control-panel, .container { overflow-y: visible; }
-        }
-
-        @media print {
-            * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-            .control-panel, .top-tools, .view-selector, .panel-label, .month-btn, .team-filter-btn { display: none !important; }
-            .page-wrapper { display: block !important; width: 100% !important; }
-            .container { border: none !important; box-shadow: none !important; padding: 0 !important; overflow: visible !important; }
-            @page { size: A4; margin: 15mm; }
-            table { page-break-inside: auto; border-top: 1px solid #bbb; }
-            tr { page-break-inside: avoid; page-break-after: auto; }
-            thead { display: none !important; }
-            tbody tr:first-child td { border-top: 1px solid #bbb; }
         }
     </style>
 </head>
@@ -93,14 +91,12 @@
     <div class="control-panel">
         <div class="top-tools">
             <button class="tool-btn" onclick="window.print()">🖨️ 印刷</button>
-            <button class="tool-btn" onclick="openSettings()">⚙️ 設定</button>
+            <button class="tool-btn" onclick="alert('設定は準備中です')">⚙️ 設定</button>
         </div>
-
         <div class="view-selector">
             <button class="btn view-btn active" onclick="changeViewMode('personal', this)">👤 個人</button>
             <button class="btn view-btn" onclick="changeViewMode('teamTotal', this)">🏢 店舗</button>
         </div>
-
         <div class="selector-row">
             <div class="selector-column">
                 <div class="panel-label">月</div>
@@ -117,15 +113,17 @@
         <div class="header-image-container">
             <div class="icon-wrapper">
                 <img src="title_f.png" alt="アイコン" class="left-icon">
-                <div id="monthTextOverlay" class="month-text-overlay">10月</div>
+                <div id="monthTextOverlay" class="month-text-overlay">年間</div>
             </div>
             <img id="headerImg" src="title.png" alt="ヘッダー画像" class="header-image">
             <div class="header-title-overlay">
                 <div class="header-title-line1">Usappy新規発券ランキング</div>
                 <div id="headerTitleLine2" class="header-title-line2">（個人別）</div>
             </div>
-            <img id="monthImg" src="10.png" alt="月" class="month-image">
+            <img id="monthImg" src="year.png" alt="月" class="month-image">
         </div>
+        
+        <div id="dateRangeDisplay" class="date-range-display"></div>
 
         <div id="loading">データを読み込み中...</div>
         <table id="rankingTable" style="display: none;">
@@ -137,23 +135,21 @@
 
 <script>
     const spreadsheetId = '14gjs9UR7LUtsuR9sau24INTmC7r5cb_p5Np0hA_jOa8';
-    const months = ['10', '11', '12', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
+    const months = ['年間', '10', '11', '12', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
     let currentSheetData = [], currentViewMode = 'personal', currentSelectedTeam = '全員';
-
-    function openSettings() { alert("設定メニューは現在準備中です。"); }
 
     async function init() {
         const container = document.getElementById('monthContainer');
         for (let m of months) {
             const btn = document.createElement('button');
             btn.className = 'btn month-btn';
-            if (m === '10') btn.classList.add('active');
-            btn.innerText = m + '月';
+            if (m === '年間') btn.classList.add('active');
+            btn.innerText = m === '年間' ? '年間' : m + '月';
             btn.onclick = () => changeMonth(m, btn);
             container.appendChild(btn);
-            checkDataExistence(m, btn);
+            if (m !== '年間') checkDataExistence(m, btn);
         }
-        loadRanking('10');
+        loadRanking('年間');
     }
 
     async function checkDataExistence(m, btn) {
@@ -165,20 +161,48 @@
         } catch (e) { btn.classList.add('disabled'); }
     }
 
+    function updateDateDisplay(sheetName) {
+        const dateDisplay = document.getElementById('dateRangeDisplay');
+        const now = new Date();
+        const currentYear = now.getFullYear();
+        if (sheetName === '年間') {
+            dateDisplay.innerText = `集計期間：2025年10月1日 ～ ${currentYear}年${now.getMonth() + 1}月${now.getDate()}日`;
+        } else {
+            const m = parseInt(sheetName);
+            const targetYear = (m >= 10 && m <= 12) ? 2025 : 2026;
+            const lastDay = new Date(targetYear, m, 0).getDate();
+            dateDisplay.innerText = `集計期間：${targetYear}年${m}月1日 ～ ${m === (now.getMonth() + 1) && targetYear === currentYear ? now.getDate() : lastDay}日`;
+        }
+    }
+
     async function loadRanking(sheetName) {
         const loadingDiv = document.getElementById('loading'), tableEl = document.getElementById('rankingTable');
-        document.getElementById('monthImg').src = `${sheetName}.png`;
-        document.getElementById('monthTextOverlay').innerText = `${sheetName}月`;
         loadingDiv.style.display = 'block'; tableEl.style.display = 'none';
+        updateDateDisplay(sheetName);
+        document.getElementById('monthImg').src = (sheetName === '年間') ? 'year.png' : `${sheetName}.png`; 
+        document.getElementById('monthTextOverlay').innerText = (sheetName === '年間') ? '年間' : `${sheetName}月`;
         
         try {
-            const res = await fetch(`https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(sheetName)}&_=${new Date().getTime()}`);
-            const text = await res.text();
-            const json = JSON.parse(text.substring(text.indexOf('{'), text.lastIndexOf('}') + 1));
-            currentSheetData = json.table.rows.filter(r => r.c && r.c[6] && r.c[6].v).map(r => ({
-                name: String(r.c[6].v).trim(), team: r.c[3] ? String(r.c[3].v).trim() : '未所属',
-                count: r.c[7] ? Number(String(r.c[7].v).replace(/[^0-9.]/g, '')) || 0 : 0
-            })).filter(i => !['名前', 'スタッフ名', '合計', '計'].includes(i.name));
+            if (sheetName === '年間') {
+                const allData = await Promise.all(months.filter(m => m !== '年間').map(async (m) => {
+                    const res = await fetch(`https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(m)}&_=${new Date().getTime()}`);
+                    const text = await res.text();
+                    const json = JSON.parse(text.substring(text.indexOf('{'), text.lastIndexOf('}') + 1));
+                    return json.table.rows.filter(r => r.c && r.c[6] && r.c[6].v).map(r => ({
+                        name: String(r.c[6].v).trim(), team: r.c[3] ? String(r.c[3].v).trim() : '未所属',
+                        count: r.c[7] ? Number(String(r.c[7].v).replace(/[^0-9.]/g, '')) || 0 : 0
+                    })).filter(i => !['名前', 'スタッフ名', '合計', '計'].includes(i.name));
+                }));
+                currentSheetData = allData.flat();
+            } else {
+                const res = await fetch(`https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(sheetName)}&_=${new Date().getTime()}`);
+                const text = await res.text();
+                const json = JSON.parse(text.substring(text.indexOf('{'), text.lastIndexOf('}') + 1));
+                currentSheetData = json.table.rows.filter(r => r.c && r.c[6] && r.c[6].v).map(r => ({
+                    name: String(r.c[6].v).trim(), team: r.c[3] ? String(r.c[3].v).trim() : '未所属',
+                    count: r.c[7] ? Number(String(r.c[7].v).replace(/[^0-9.]/g, '')) || 0 : 0
+                })).filter(i => !['名前', 'スタッフ名', '合計', '計'].includes(i.name));
+            }
             generateTeamButtons(); updateDisplay();
         } catch (e) { loadingDiv.innerText = '読み込み失敗'; }
     }
@@ -201,12 +225,20 @@
         tbody.innerHTML = '';
         if (currentViewMode === 'personal') {
             h2.innerText = '（個人別）';
-            document.getElementById('tableHeader').innerHTML = `<tr><th class="col-rank">順位</th><th class="col-name">名前</th><th class="col-count">件数</th><th class="col-team">所属</th></tr>`;
-            (currentSelectedTeam === '全員' ? currentSheetData : currentSheetData.filter(i => i.team === currentSelectedTeam))
-                .sort((a, b) => b.count - a.count).forEach((item, i) => {
+            document.getElementById('tableHeader').innerHTML = `<tr><th class="col-rank">順位</th><th class="col-name">名前</th><th class="col-team">所属</th><th class="col-count">件数</th></tr>`;
+            const personalMap = {};
+            currentSheetData.forEach(i => {
+                const key = i.name + "_" + i.team;
+                if (!personalMap[key]) personalMap[key] = {name: i.name, team: i.team, count: 0};
+                personalMap[key].count += i.count;
+            });
+            Object.values(personalMap)
+                .filter(i => currentSelectedTeam === '全員' || i.team === currentSelectedTeam)
+                .sort((a, b) => b.count - a.count)
+                .forEach((item, i) => {
                     const tr = document.createElement('tr');
                     if (i < 3) tr.className = `rank-${i+1}`;
-                    tr.innerHTML = `<td class="col-rank">${i+1}位</td><td class="col-name"><strong>${item.name}</strong></td><td class="col-count">${item.count.toLocaleString()} 件</td><td class="col-team">${item.team}</td>`;
+                    tr.innerHTML = `<td class="col-rank">${i+1}位</td><td class="col-name"><strong>${item.name}</strong></td><td class="col-team">${item.team}</td><td class="col-count">${item.count.toLocaleString()} 件</td>`;
                     tbody.appendChild(tr);
                 });
         } else {
