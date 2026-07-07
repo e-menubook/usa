@@ -171,7 +171,7 @@
 
     async function init() {
         const container = document.getElementById('monthContainer');
-        container.innerHTML = ''; // ボタンの重複生成を防ぐため、一度中身をクリアする
+        container.innerHTML = ''; 
         for (let m of months) {
             const btn = document.createElement('button');
             btn.className = 'btn month-btn';
@@ -320,38 +320,44 @@
                 const data = new Uint8Array(e.target.result);
                 const workbook = XLSX.read(data, {type: 'array'});
                 let newStore = {};
+                
                 workbook.SheetNames.forEach(sheetName => {
                     const sheet = workbook.Sheets[sheetName];
                     const json = XLSX.utils.sheet_to_json(sheet, {header: 1}); 
                     let parsedRows = [];
+                    
                     for (let i = 1; i < json.length; i++) { 
                         const row = json[i];
-                        if (row && row.length >= 7 && row[6]) { 
+                        // H列（インデックス7）までデータが存在するかチェック
+                        if (row && row.length >= 8 && row[6]) { 
                             parsedRows.push({
-                                name: String(row[6]).trim(),
-                                team: row[3] ? String(row[3]).trim() : '未所属',
-                                count: row[7] ? Number(String(row[7]).replace(/[^0-9.]/g, '')) || 0 : 0
+                                name: String(row[6]).trim(),                  // G列 (名前)
+                                team: row[3] ? String(row[3]).trim() : '未所属', // D列 (店舗)
+                                count: row[7] ? Number(String(row[7]).replace(/[^0-9.]/g, '')) || 0 : 0 // H列 (件数)
                             });
                         }
                     }
                     newStore[sheetName] = parsedRows;
                 });
                 
-                // GASにデータを送信
-                await fetch(gasUrl, { method: 'POST', mode: 'no-cors', headers: {'Content-Type': 'text/plain'}, body: JSON.stringify(newStore) });
+                // GASに指定した形式（店舗・名前・件数）で絞り込んだJSONを送信
+                await fetch(gasUrl, { 
+                    method: 'POST', 
+                    mode: 'no-cors', 
+                    headers: {'Content-Type': 'text/plain'}, 
+                    body: JSON.stringify(newStore) 
+                });
                 
-                alert("データを送信しました。\nスプレッドシートの更新を待ってから再読み込みします。");
+                alert("指定した列（店舗・名前・件数）のデータをGASへ送信しました。\nスプレッドシートの更新を待ってから再読み込みします。");
                 saveBtn.innerText = "💾 保存";
                 saveBtn.disabled = false;
                 closeSettings();
                 
-                // 画面を一時的にローディング表示にして待機させる
                 const loadingDiv = document.getElementById('loading');
                 loadingDiv.style.display = 'block';
                 loadingDiv.innerText = 'スプレッドシートの更新を待機中...（数秒かかります）';
                 document.getElementById('rankingTable').style.display = 'none';
                 
-                // GASでのスプレッドシート書き込み完了を待つため、3秒(3000ミリ秒)待ってから再読み込みを実行（修正箇所）
                 setTimeout(() => {
                     init(); 
                 }, 3000);
