@@ -70,7 +70,7 @@
         table { width: 100%; border-collapse: collapse; border: 1px solid #bbb; font-size: 14px; table-layout: fixed; }
         th, td { padding: 12px 8px; border: 1px solid #ccc; word-wrap: break-word; }
         th { background-color: #107c41; color: #fff; }
-        .col-rank { text-align: center; width: 10%; background-color: #f9f9f9; }
+        .col-rank { text-align: center; width: 10%; }
         .col-name { width: 30%; }
         .col-count { text-align: right; width: 15%; font-weight: bold; white-space: nowrap; }
         .col-team { width: 45%; }
@@ -101,6 +101,70 @@
         }
         .btn-save { background-color: #107c41; }
         .btn-close { background-color: #666; }
+
+        /* ========================================================
+           【修正】印刷専用スタイル（50人分を確実に1〜2ページに収める）
+           ======================================================== */
+        @media print {
+            @page {
+                size: A4 portrait; /* A4縦固定 */
+                margin: 10mm 12mm; /* 上下左右の余白 */
+            }
+
+            /* スクロールや全体の高さをリセットしてすべて表示させる */
+            body, html {
+                height: auto !important;
+                overflow: visible !important;
+                background: #fff !important;
+                color: #000 !important;
+                padding: 0 !important;
+                margin: 0 !important;
+            }
+
+            /* 不要なコントロールパネル、ボタン、モーダル、読み込み表示を完全に消す */
+            .control-panel, .top-tools, .view-selector, #settingsModal, #loading {
+                display: none !important;
+            }
+
+            /* メインコンテナの幅を100%にして余白・影・枠線をリセット */
+            .page-wrapper {
+                display: block !important;
+                width: 100% !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+
+            .container {
+                border: none !important;
+                box-shadow: none !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                overflow: visible !important;
+                width: 100% !important;
+                display: block !important;
+            }
+
+            /* テーブルの改ページ位置を綺麗に保つ */
+            table {
+                page-break-inside: auto;
+                width: 100% !important;
+            }
+            tr {
+                page-break-inside: avoid;
+                page-break-after: auto;
+            }
+
+            /* 50人分が2ページに美しく収まるよう、文字サイズと行間をわずかに引き締め */
+            th, td {
+                padding: 6.5px 5px !important;
+                font-size: 12px !important;
+            }
+
+            /* 【修正】51行目以降（50人を超えるデータ）を印刷時のみ強制非表示 */
+            #rankingBody tr:nth-child(n+51) {
+                display: none !important;
+            }
+        }
     </style>
 </head>
 <body>
@@ -154,7 +218,7 @@
 <div id="settingsModal">
     <div class="modal-content">
         <h3>データ設定</h3>
-        <p>EXCELファイルを読み込んでデータをGASへ送信します。</p>
+        <p>EXCELファイルを読み込みます。</p>
         <input type="file" id="excelFileInput" accept=".xlsx, .xls" style="margin: 15px 0; width: 100%;">
         <div>
             <button id="saveBtn" class="modal-btn btn-save" onclick="saveExcelData()">💾 保存</button>
@@ -164,10 +228,11 @@
 </div>
 
 <script>
-    const spreadsheetId = '14gjs9UR7LUtsuR9sau24INTmC7r5cb_p5Np0hA_jOa8';
-    const gasUrl = 'https://script.google.com/macros/s/AKfycbwfspaaVPa-tBOP-J0gWNDxdN9hslKCb9vHOHAR6vpVKGiCPQXyzS4d07NjpoKXw9y1/exec';
+    const gasUrl = 'https://script.google.com/macros/s/AKfycbyHDoMpuind3RK-k4d8O6ggjdaRU7bAQqhf4_SqVkoNZntQ4Rk9DUmV_wAGJGngEqO0/exec';
     const months = ['年間', '10', '11', '12', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
-    let currentSheetData = [], currentViewMode = 'personal', currentSelectedTeam = '全員';
+    
+    let allMonthsDataStore = {}; 
+    let currentSheetData = [], currentViewMode = 'personal', currentSelectedTeam = '全店舗', currentSelectedMonth = '年間';
 
     async function init() {
         const container = document.getElementById('monthContainer');
@@ -179,18 +244,58 @@
             btn.innerText = m === '年間' ? '年間' : m + '月';
             btn.onclick = () => changeMonth(m, btn);
             container.appendChild(btn);
-            if (m !== '年間') checkDataExistence(m, btn);
         }
-        loadRanking('年間');
+        
+        await preloadAllData();
     }
 
-    async function checkDataExistence(m, btn) {
+    async function preloadAllData() {
+        const loadingDiv = document.getElementById('loading'), tableEl = document.getElementById('rankingTable');
+        loadingDiv.style.display = 'block';
+        tableEl.style.display = 'none';
+        loadingDiv.innerText = 'データを読み込み中...';
+
         try {
-            const res = await fetch(`https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(m)}&_=${new Date().getTime()}`);
-            const text = await res.text();
-            const json = JSON.parse(text.substring(text.indexOf('{'), text.lastIndexOf('}') + 1));
-            if (!json.table.rows || json.table.rows.length === 0) { btn.classList.add('disabled'); btn.onclick = null; }
-        } catch (e) { btn.classList.add('disabled'); }
+            const fetchPromises = months.filter(m => m !== '年間').map(async (m) => {
+                try {
+                    const res = await fetch(`${gasUrl}?sheet=${encodeURIComponent(m)}&_=${new Date().getTime()}`);
+                    const json = await res.json();
+                    allMonthsDataStore[m] = Array.isArray(json) ? json : [];
+                } catch (e) {
+                    allMonthsDataStore[m] = [];
+                }
+            });
+
+            await Promise.all(fetchPromises);
+
+            allMonthsDataStore['年間'] = Object.values(allMonthsDataStore).flat();
+
+            const buttons = document.querySelectorAll('.month-btn');
+            buttons.forEach(btn => {
+                const m = btn.innerText.replace('月', '');
+                if (m !== '年間' && allMonthsDataStore[m].length === 0) {
+                    btn.classList.add('disabled');
+                    btn.onclick = null;
+                }
+            });
+
+            setMonthData('年間');
+
+        } catch (e) {
+            loadingDiv.innerText = 'データの初期読み込みに失敗しました。';
+        }
+    }
+
+    function setMonthData(sheetName) {
+        currentSelectedMonth = sheetName;
+        updateDateDisplay(sheetName);
+        document.getElementById('monthImg').src = (sheetName === '年間') ? 'year.png' : `${sheetName}.png`; 
+        document.getElementById('monthTextOverlay').innerText = (sheetName === '年間') ? '年間' : `${sheetName}月`;
+        
+        currentSheetData = allMonthsDataStore[sheetName] || [];
+        
+        generateTeamButtons(); 
+        updateDisplay();
     }
 
     function updateDateDisplay(sheetName) {
@@ -207,54 +312,33 @@
         }
     }
 
-    async function loadRanking(sheetName) {
-        const loadingDiv = document.getElementById('loading'), tableEl = document.getElementById('rankingTable');
-        loadingDiv.style.display = 'block'; tableEl.style.display = 'none';
-        updateDateDisplay(sheetName);
-        document.getElementById('monthImg').src = (sheetName === '年間') ? 'year.png' : `${sheetName}.png`; 
-        document.getElementById('monthTextOverlay').innerText = (sheetName === '年間') ? '年間' : `${sheetName}月`;
-        
-        try {
-            if (sheetName === '年間') {
-                const allData = await Promise.all(months.filter(m => m !== '年間').map(async (m) => {
-                    const res = await fetch(`https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(m)}&_=${new Date().getTime()}`);
-                    const text = await res.text();
-                    const json = JSON.parse(text.substring(text.indexOf('{'), text.lastIndexOf('}') + 1));
-                    return json.table.rows.filter(r => r.c && r.c[6] && r.c[6].v).map(r => ({
-                        name: String(r.c[6].v).trim(), team: r.c[3] ? String(r.c[3].v).trim() : '未所属',
-                        count: r.c[7] ? Number(String(r.c[7].v).replace(/[^0-9.]/g, '')) || 0 : 0
-                    })).filter(i => !['名前', 'スタッフ名', '合計', '計'].includes(i.name));
-                }));
-                currentSheetData = allData.flat();
-            } else {
-                const res = await fetch(`https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(sheetName)}&_=${new Date().getTime()}`);
-                const text = await res.text();
-                const json = JSON.parse(text.substring(text.indexOf('{'), text.lastIndexOf('}') + 1));
-                currentSheetData = json.table.rows.filter(r => r.c && r.c[6] && r.c[6].v).map(r => ({
-                    name: String(r.c[6].v).trim(), team: r.c[3] ? String(r.c[3].v).trim() : '未所属',
-                    count: r.c[7] ? Number(String(r.c[7].v).replace(/[^0-9.]/g, '')) || 0 : 0
-                })).filter(i => !['名前', 'スタッフ名', '合計', '計'].includes(i.name));
-            }
-            generateTeamButtons(); updateDisplay();
-        } catch (e) { loadingDiv.innerText = '読み込み失敗'; }
-    }
-
     function generateTeamButtons() {
         const container = document.getElementById('teamButtonContainer');
-        container.innerHTML = `<button class="btn team-filter-btn active" onclick="filterByTeam('全員', this)">全員</button>`;
+        const previousSelectedTeam = currentSelectedTeam;
+        
+        container.innerHTML = `<button class="btn team-filter-btn" id="team-btn-all" onclick="filterByTeam('全店舗', this)">全店舗</button>`;
         if (currentViewMode === 'teamTotal') return;
+        
         const uniqueTeams = [...new Set(currentSheetData.map(i => i.team).filter(t => t !== '未所属'))];
         uniqueTeams.forEach(t => {
             const btn = document.createElement('button');
             btn.className = 'btn team-filter-btn';
+            btn.id = `team-btn-${t}`;
             btn.innerText = t; btn.onclick = () => filterByTeam(t, btn);
             container.appendChild(btn);
         });
+
+        const activeBtn = document.getElementById(`team-btn-${previousSelectedTeam}`) || document.getElementById('team-btn-all');
+        if (activeBtn) {
+            activeBtn.classList.add('active');
+            currentSelectedTeam = activeBtn.innerText === '全店舗' ? '全店舗' : previousSelectedTeam;
+        }
     }
 
     function updateDisplay() {
         const tbody = document.getElementById('rankingBody'), h2 = document.getElementById('headerTitleLine2');
         tbody.innerHTML = '';
+        
         if (currentViewMode === 'personal') {
             h2.innerText = '（個人別）';
             document.getElementById('tableHeader').innerHTML = `<tr><th class="col-rank">順位</th><th class="col-name">名前</th><th class="col-team">所属</th><th class="col-count">件数</th></tr>`;
@@ -264,23 +348,39 @@
                 if (!personalMap[key]) personalMap[key] = {name: i.name, team: i.team, count: 0};
                 personalMap[key].count += i.count;
             });
+
+            let rank = 1;
+            let prevCount = -1;
+
             Object.values(personalMap)
-                .filter(i => currentSelectedTeam === '全員' || i.team === currentSelectedTeam)
+                .filter(i => currentSelectedTeam === '全店舗' || i.team === currentSelectedTeam)
                 .sort((a, b) => b.count - a.count)
                 .forEach((item, i) => {
+                    if (item.count !== prevCount) {
+                        rank = i + 1;
+                        prevCount = item.count;
+                    }
                     const tr = document.createElement('tr');
-                    if (i < 3) tr.className = `rank-${i+1}`;
-                    tr.innerHTML = `<td class="col-rank">${i+1}位</td><td class="col-name"><strong>${item.name}</strong></td><td class="col-team">${item.team}</td><td class="col-count">${item.count.toLocaleString()} 件</td>`;
+                    if (rank <= 3) tr.className = `rank-${rank}`;
+                    tr.innerHTML = `<td class="col-rank">${rank}位</td><td class="col-name"><strong>${item.name}</strong></td><td class="col-team">${item.team}</td><td class="col-count">${item.count.toLocaleString()} 件</td>`;
                     tbody.appendChild(tr);
                 });
         } else {
             h2.innerText = '（店舗別）';
             document.getElementById('tableHeader').innerHTML = `<tr><th class="col-rank">順位</th><th class="col-name">店舗名</th><th class="col-count">合計件数</th></tr>`;
             const map = {}; currentSheetData.forEach(i => map[i.team] = (map[i.team] || 0) + i.count);
+            
+            let rank = 1;
+            let prevCount = -1;
+
             Object.keys(map).map(t => ({t, c: map[t]})).sort((a, b) => b.c - a.c).forEach((item, i) => {
+                if (item.c !== prevCount) {
+                    rank = i + 1;
+                    prevCount = item.c;
+                }
                 const tr = document.createElement('tr');
-                if (i < 3) tr.className = `rank-${i+1}`;
-                tr.innerHTML = `<td class="col-rank">${i+1}位</td><td class="col-name"><strong>${item.t}</strong></td><td class="col-count">${item.c.toLocaleString()} 件</td>`;
+                if (rank <= 3) tr.className = `rank-${rank}`;
+                tr.innerHTML = `<td class="col-rank">${rank}位</td><td class="col-name"><strong>${item.t}</strong></td><td class="col-count">${item.c.toLocaleString()} 件</td>`;
                 tbody.appendChild(tr);
             });
         }
@@ -288,7 +388,12 @@
         document.getElementById('rankingTable').style.display = 'table';
     }
 
-    function changeMonth(m, btn) { document.querySelectorAll('.month-btn').forEach(b => b.classList.remove('active')); btn.classList.add('active'); loadRanking(m); }
+    function changeMonth(m, btn) { 
+        document.querySelectorAll('.month-btn').forEach(b => b.classList.remove('active')); 
+        btn.classList.add('active'); 
+        setMonthData(m); 
+    }
+    
     function changeViewMode(m, btn) { currentViewMode = m; document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active')); btn.classList.add('active'); document.getElementById('teamSelectorSection').style.display = (m === 'personal') ? 'block' : 'none'; updateDisplay(); }
     function filterByTeam(t, btn) { currentSelectedTeam = t; document.querySelectorAll('.team-filter-btn').forEach(b => b.classList.remove('active')); btn.classList.add('active'); updateDisplay(); }
 
@@ -328,19 +433,17 @@
                     
                     for (let i = 1; i < json.length; i++) { 
                         const row = json[i];
-                        // H列（インデックス7）までデータが存在するかチェック
                         if (row && row.length >= 8 && row[6]) { 
                             parsedRows.push({
-                                name: String(row[6]).trim(),                  // G列 (名前)
-                                team: row[3] ? String(row[3]).trim() : '未所属', // D列 (店舗)
-                                count: row[7] ? Number(String(row[7]).replace(/[^0-9.]/g, '')) || 0 : 0 // H列 (件数)
+                                name: String(row[6]).trim(),
+                                team: row[3] ? String(row[3]).trim() : '未所属',
+                                count: row[7] ? Number(String(row[7]).replace(/[^0-9.]/g, '')) || 0 : 0
                             });
                         }
                     }
                     newStore[sheetName] = parsedRows;
                 });
                 
-                // GASに指定した形式（店舗・名前・件数）で絞り込んだJSONを送信
                 await fetch(gasUrl, { 
                     method: 'POST', 
                     mode: 'no-cors', 
@@ -348,14 +451,14 @@
                     body: JSON.stringify(newStore) 
                 });
                 
-                alert("指定した列（店舗・名前・件数）のデータをGASへ送信しました。\nスプレッドシートの更新を待ってから再読み込みします。");
+                alert("データを保存しました。再読み込みします。");
                 saveBtn.innerText = "💾 保存";
                 saveBtn.disabled = false;
                 closeSettings();
                 
                 const loadingDiv = document.getElementById('loading');
                 loadingDiv.style.display = 'block';
-                loadingDiv.innerText = 'スプレッドシートの更新を待機中...（数秒かかります）';
+                loadingDiv.innerText = 'スプレッドシートの更新を待記中...（数秒かかります）';
                 document.getElementById('rankingTable').style.display = 'none';
                 
                 setTimeout(() => {
