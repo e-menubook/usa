@@ -102,16 +102,12 @@
         .btn-save { background-color: #107c41; }
         .btn-close { background-color: #666; }
 
-        /* ========================================================
-           【修正】印刷専用スタイル（50人分を確実に1〜2ページに収める）
-           ======================================================== */
         @media print {
             @page {
-                size: A4 portrait; /* A4縦固定 */
-                margin: 10mm 12mm; /* 上下左右の余白 */
+                size: A4 portrait;
+                margin: 10mm 12mm;
             }
 
-            /* スクロールや全体の高さをリセットしてすべて表示させる */
             body, html {
                 height: auto !important;
                 overflow: visible !important;
@@ -121,12 +117,10 @@
                 margin: 0 !important;
             }
 
-            /* 不要なコントロールパネル、ボタン、モーダル、読み込み表示を完全に消す */
             .control-panel, .top-tools, .view-selector, #settingsModal, #loading {
                 display: none !important;
             }
 
-            /* メインコンテナの幅を100%にして余白・影・枠線をリセット */
             .page-wrapper {
                 display: block !important;
                 width: 100% !important;
@@ -144,7 +138,6 @@
                 display: block !important;
             }
 
-            /* テーブルの改ページ位置を綺麗に保つ */
             table {
                 page-break-inside: auto;
                 width: 100% !important;
@@ -154,20 +147,18 @@
                 page-break-after: auto;
             }
 
-            /* 50人分が2ページに美しく収まるよう、文字サイズと行間をわずかに引き締め */
             th, td {
                 padding: 6.5px 5px !important;
                 font-size: 12px !important;
             }
 
-            /* 【修正】51行目以降（50人を超えるデータ）を印刷時のみ強制非表示 */
             #rankingBody tr:nth-child(n+51) {
                 display: none !important;
             }
         }
     </style>
 </head>
-<body>
+<body style="display: none;">
 
 <div class="page-wrapper">
     <div class="control-panel">
@@ -234,7 +225,29 @@
     let allMonthsDataStore = {}; 
     let currentSheetData = [], currentViewMode = 'personal', currentSelectedTeam = '全店舗', currentSelectedMonth = '年間';
 
+    // 【変更】アプリ起動時の初期化処理
     async function init() {
+        let authenticated = false;
+        
+        // パスワードが一致するまで入力をループ要求
+        while (!authenticated) {
+            const password = prompt("このアプリケーションを閲覧するにはパスワードが必要です。");
+            
+            if (password === "8541") {
+                authenticated = true;
+            } else if (password === null) {
+                // キャンセルが押された場合は処理を中断し、白い画面のままにする
+                document.body.innerHTML = '<div style="text-align:center; margin-top:50px; font-weight:bold; color:red; font-family:sans-serif;">アクセスが拒否されました。閲覧するにはページを再読み込みしてパスワードを入力してください。</div>';
+                document.body.style.display = 'block';
+                return;
+            } else {
+                alert("パスワードが間違っています。");
+            }
+        }
+        
+        // 認証成功後に画面を表示状態（flex）にする
+        document.body.style.display = 'flex';
+
         const container = document.getElementById('monthContainer');
         container.innerHTML = ''; 
         for (let m of months) {
