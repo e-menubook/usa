@@ -225,9 +225,9 @@
     let allMonthsDataStore = {}; 
     let currentSheetData = [], currentViewMode = 'personal', currentSelectedTeam = '全店舗', currentSelectedMonth = '年間';
 
-    // 【変更】アプリ起動時の初期化処理
-    async function init() {
-        let authenticated = false;
+    // アプリ起動時の初期化処理
+    async function init(skipPassword = false) {
+        let authenticated = skipPassword;
         
         // パスワードが一致するまで入力をループ要求
         while (!authenticated) {
@@ -262,33 +262,44 @@
         await preloadAllData();
     }
 
+    // 【大幅修正】GASへの一斉負荷を避けるため、1か月ずつ確実に直列処理で読み込む
     async function preloadAllData() {
         const loadingDiv = document.getElementById('loading'), tableEl = document.getElementById('rankingTable');
         loadingDiv.style.display = 'block';
         tableEl.style.display = 'none';
-        loadingDiv.innerText = 'データを読み込み中...';
 
         try {
-            const fetchPromises = months.filter(m => m !== '年間').map(async (m) => {
+            const activeMonths = months.filter(m => m !== '年間');
+            
+            // ループで1つずつ順番にFetchを実行（GASの接続制限を回避）
+            for (let m of activeMonths) {
+                loadingDiv.innerText = `${m}月のデータを読み込み中...`;
                 try {
                     const res = await fetch(`${gasUrl}?sheet=${encodeURIComponent(m)}&_=${new Date().getTime()}`);
+                    if (!res.ok) throw new Error(`HTTP Error: ${res.status}`);
                     const json = await res.json();
                     allMonthsDataStore[m] = Array.isArray(json) ? json : [];
                 } catch (e) {
-                    allMonthsDataStore[m] = [];
+                    console.error(`${m}月のデータ取得に失敗しました:`, e);
+                    allMonthsDataStore[m] = []; // エラーが起きた月は空として処理を継続
                 }
-            });
+            }
 
-            await Promise.all(fetchPromises);
-
+            loadingDiv.innerText = '全データを統合中...';
             allMonthsDataStore['年間'] = Object.values(allMonthsDataStore).flat();
 
+            // データが存在しない月のボタンをグレーアウト（無効化）
             const buttons = document.querySelectorAll('.month-btn');
             buttons.forEach(btn => {
                 const m = btn.innerText.replace('月', '');
-                if (m !== '年間' && allMonthsDataStore[m].length === 0) {
-                    btn.classList.add('disabled');
-                    btn.onclick = null;
+                if (m !== '年間') {
+                    if (!allMonthsDataStore[m] || allMonthsDataStore[m].length === 0) {
+                        btn.classList.add('disabled');
+                        btn.onclick = null;
+                    } else {
+                        btn.classList.remove('disabled');
+                        btn.onclick = () => changeMonth(m, btn);
+                    }
                 }
             });
 
@@ -471,11 +482,12 @@
                 
                 const loadingDiv = document.getElementById('loading');
                 loadingDiv.style.display = 'block';
-                loadingDiv.innerText = 'スプレッドシートの更新を待記中...（数秒かかります）';
+                loadingDiv.innerText = 'スプレッドシートの更新を待機中...（数秒かかります）';
                 document.getElementById('rankingTable').style.display = 'none';
                 
+                // 【変更】保存後の自動再読み込み時は、パスワード画面をスキップ（trueを渡す）
                 setTimeout(() => {
-                    init(); 
+                    init(true); 
                 }, 3000);
 
             } catch (error) {
@@ -487,7 +499,10 @@
         reader.readAsArrayBuffer(file);
     }
 
-    init();
+    // HTML要素の読み込みが確実に終わってから初期化を走らせる
+    window.addEventListener('DOMContentLoaded', () => {
+        init();
+    });
 </script>
 </body>
 </html>
